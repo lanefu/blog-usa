@@ -54,8 +54,8 @@ I made an ansible playbook to install docker, create a privileged user account f
 ```yaml
 ## prereq: ansible-galaxy install monolithprojects.github_actions_runner
 
-- hosts: [ 'github_runners' ]
-  ignore_errors: true 
+- hosts: github_runners
+  gather_facts: no
 
   vars:
     - github_account: example
@@ -63,15 +63,12 @@ I made an ansible playbook to install docker, create a privileged user account f
     - access_token: "{{ vaulted_example }}"
     - runner_user: github
   
-  pre_tasks:
-   - name: install python
-     raw: "apt install python3 -y"
-     become: yes
-
-   - name: get facts
-     setup:
-
   tasks:
+    - name: install python
+      raw: "apt install python3 -y"
+      become: yes
+
+    - gather_facts:
 
 # Ubuntu 18.04 provides git 1.17
 # https://github.com/actions/checkout requires git >= 1.18
@@ -79,32 +76,31 @@ I made an ansible playbook to install docker, create a privileged user account f
     apt_repository:
       repo: ppa:git-core/ppa
 
-  - name: install packags
-    apt:
-     name: "{{ item }}"
-     update_cache: yes
-     state: latest
-    loop:
-      - docker.io
-      - git
+  - name: install packages
+     apt:
+       name:
+         - docker.io
+         - git
+       update_cache: yes
+       state: latest
 
-  - name: add privileged user account for github runner
-    user:
-      name: "{{ runner_user }}"
-      shell: /bin/bash
-      groups: sudo, docker
-      append: yes
+   - name: add privileged user account for github runner
+     user:
+       name: "{{ runner_user }}"
+       shell: /bin/bash
+       groups: sudo, docker
+       append: yes
 
-  - name: configure passwordless sudo
-    lineinfile:
-      dest: /etc/sudoers
-      line: "%sudo  ALL=(ALL) NOPASSWD: ALL"
-      regex: "^%sudo"
+   - name: configure passwordless sudo
+     lineinfile:
+       dest: /etc/sudoers
+       line: "%sudo  ALL=(ALL) NOPASSWD: ALL"
+       regex: "^%sudo"
+     validate: visudo -cf %s
 
-  - name: github actions runner role
-    include_role:
-      name: monolithprojects.github_actions_runner
-
+   - name: github actions runner role
+     import_role:
+       name: monolithprojects.github_actions_runner
 ```
 The new runner joined the repo after playbook execution.
 `ansible-playbook github-runner.yml --become`
